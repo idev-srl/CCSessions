@@ -46,16 +46,117 @@ func (e *fakeEnv) write(p, content string) string {
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 func TestEncodeProjectPath(t *testing.T) {
+	// Expected values were produced by running Claude Code 2.1.x's own
+	// JavaScript encoder on the same inputs.
+	long1 := `C:\Users\dev\source\` + strings.Repeat("very-long-project-name-", 9) + "end"
+	long2 := `C:\Progetti\Università\tesi 🚀 ` + strings.Repeat("x", 220)
 	cases := map[string]string{
 		`C:\Users\dev\Documents\sources\CCSessions`:   "C--Users-dev-Documents-sources-CCSessions",
 		`C:\Users\dev\Documents\sources\Corelink API`: "C--Users-dev-Documents-sources-Corelink-API",
-		`C:\src\CiasTuner_NanoPi`:                       "C--src-CiasTuner-NanoPi",
-		`F:\droneID_ESP32`:                              "F--droneID-ESP32",
+		`C:\src\CiasTuner_NanoPi`:                     "C--src-CiasTuner-NanoPi",
+		`F:\droneID_ESP32`:                            "F--droneID-ESP32",
+		`C:\Progetti\Università`:                      "C--Progetti-Universit-",
+		`C:\Più`:                                      "C--Pi-",
+		`D:\app 🚀`:                                    "D--app---", // emoji = 2 UTF-16 code units
+		`\\server\share\dir`:                          "--server-share-dir",
+		`C:\`:                                         "C--",
+		long1:                                         "C--Users-dev-source-" + strings.Repeat("very-long-project-name-", 7) + "very-long-project-n-69jc3c",
+		long2:                                         "C--Progetti-Universit--tesi----" + strings.Repeat("x", 169) + "-cp8fki",
 	}
 	for in, want := range cases {
-		if got := EncodeProjectPath(in); got != want {
+		got := EncodeProjectPath(in)
+		if got != want {
 			t.Errorf("EncodeProjectPath(%q) = %q, want %q", in, got, want)
 		}
+		if len(got) > maxProjectDirName+1+7 {
+			t.Errorf("EncodeProjectPath(%q) too long: %d", in, len(got))
+		}
+	}
+}
+
+func TestAttachProjectFolders(t *testing.T) {
+	e := newFakeEnv(t)
+	sc := NewScanner(e.loc)
+	projects := e.loc.ProjectsDir()
+
+	accented := `C:\Progetti\Università`
+	encoded := filepath.Join(projects, EncodeProjectPath(accented))
+	e.write(filepath.Join(encoded, "memory", "MEMORY.md"), "m")
+
+	// Folder whose name does not match the encoding (e.g. a future rule change).
+	odd := filepath.Join(projects, "renamed-by-a-future-version")
+	e.write(filepath.Join(odd, "s1.jsonl"), "{}")
+	shared1 := filepath.Join(projects, "C--multi-a")
+	shared2 := filepath.Join(projects, "C--multi-b")
+	e.write(filepath.Join(shared1, "s2.jsonl"), "{}")
+	e.write(filepath.Join(shared2, "s3.jsonl"), "{}")
+
+	dirs := []Directory{
+		{Path: accented, Key: NormalizePath(accented)},
+		{Path: `C:\fallback`, Key: `c:\fallback`, TranscriptDirs: []string{odd}},
+		{Path: `C:\multi`, Key: `c:\multi`, TranscriptDirs: []string{shared1, shared2}},
+		{Path: `C:\outside`, Key: `c:\outside`, TranscriptDirs: []string{e.root}},
+	}
+	sc.attachProjectFolders(dirs)
+
+	if dirs[0].ProjectFolder != encoded || !dirs[0].HasMemory {
+		t.Errorf("accented: %+v", dirs[0])
+	}
+	if dirs[1].ProjectFolder != odd {
+		t.Errorf("fallback: %q", dirs[1].ProjectFolder)
+	}
+	if dirs[2].ProjectFolder != "" {
+		t.Errorf("no fallback with several transcript folders: %q", dirs[2].ProjectFolder)
+	}
+	if dirs[3].ProjectFolder != "" {
+		t.Errorf("fallback outside the projects folder: %q", dirs[3].ProjectFolder)
+	}
+}
+
+func TestPlanRemovalAccentedPath(t *testing.T) {
+	e := newFakeEnv(t)
+	path := `C:\Progetti\Università`
+	folder := filepath.Join(e.loc.ProjectsDir(), EncodeProjectPath(path))
+	e.write(filepath.Join(folder, "s1.jsonl"), "{}")
+	mem := e.write(filepath.Join(folder, "memory", "MEMORY.md"), "m")
+	e.write(e.loc.ClaudeJSON, `{"projects":{"C:/Progetti/Università":{}}}`)
+
+	d := Directory{Path: path, Key: NormalizePath(path), TranscriptDirs: []string{folder},
+		Sessions: []Session{{ID: "s1", File: filepath.Join(folder, "s1.jsonl"), Cwd: path}}}
+	all := []Directory{d}
+	NewScanner(e.loc).attachProjectFolders(all)
+
+	plan := PlanRemoval(e.loc, all[0], all)
+	if plan.ProjectFolder != folder || !plan.HasMemory || len(plan.SessionFiles) != 0 || len(plan.ClaudeJSONKeys) != 1 {
+		t.Fatalf("plan = %+v", plan)
+	}
+	if _, err := ExecuteRemoval(e.loc, plan); err != nil {
+		t.Fatal(err)
+	}
+	if exists(mem) || exists(folder) {
+		t.Error("auto-memory not removed")
+	}
+}
+
+func TestPlanRemovalFallbackSharedFolder(t *testing.T) {
+	// Two directories whose transcripts end up in the same folder: the
+	// fallback may pick it, but it must never be deleted whole.
+	e := newFakeEnv(t)
+	folder := filepath.Join(e.loc.ProjectsDir(), "shared-folder")
+	e.write(filepath.Join(folder, "a.jsonl"), "{}")
+	e.write(filepath.Join(folder, "b.jsonl"), "{}")
+	a := Directory{Path: `C:\a`, Key: `c:\a`, TranscriptDirs: []string{folder},
+		Sessions: []Session{{ID: "a", File: filepath.Join(folder, "a.jsonl")}}}
+	b := Directory{Path: `C:\b`, Key: `c:\b`, TranscriptDirs: []string{folder},
+		Sessions: []Session{{ID: "b", File: filepath.Join(folder, "b.jsonl")}}}
+	all := []Directory{a, b}
+	NewScanner(e.loc).attachProjectFolders(all)
+	if all[0].ProjectFolder != folder {
+		t.Fatalf("fallback not applied: %+v", all[0])
+	}
+	plan := PlanRemoval(e.loc, all[0], all)
+	if plan.ProjectFolder != "" || len(plan.SessionFiles) != 1 {
+		t.Errorf("shared folder planned for whole deletion: %+v", plan)
 	}
 }
 

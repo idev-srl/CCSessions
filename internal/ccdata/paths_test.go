@@ -7,10 +7,10 @@ import (
 
 func TestNormalizePath(t *testing.T) {
 	cases := map[string]string{
-		`C:\Users\dev\Proj`:        `c:\users\dev\proj`,
-		`C:/Users/dev/Proj`:        `c:\users\dev\proj`,
-		`c:\users\dev\proj\`:       `c:\users\dev\proj`,
-		`C:\Users\\dev//Proj/`:     `c:\users\dev\proj`,
+		`C:\Users\dev\Proj`:          `c:\users\dev\proj`,
+		`C:/Users/dev/Proj`:          `c:\users\dev\proj`,
+		`c:\users\dev\proj\`:         `c:\users\dev\proj`,
+		`C:\Users\\dev//Proj/`:       `c:\users\dev\proj`,
 		`C:\`:                        `c:\`,
 		`C:/`:                        `c:\`,
 		`C:`:                         `c:\`,

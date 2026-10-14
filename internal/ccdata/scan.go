@@ -6,9 +6,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf16"
 )
 
 // Directory is a working directory in which Claude Code was started,
@@ -329,33 +331,101 @@ func markExisting(dirs []Directory) {
 	wg.Wait()
 }
 
+// maxProjectDirName is the length above which Claude Code truncates the
+// encoded folder name and appends a hash of the original path.
+const maxProjectDirName = 200
+
 // EncodeProjectPath returns the folder name Claude Code uses under
-// <base>\projects for a working directory: every character that is not an
-// ASCII letter or digit becomes '-'. The mapping is not reversible.
+// <base>\projects for a working directory. Claude Code applies the
+// JavaScript regex /[^a-zA-Z0-9]/g, which works on UTF-16 code units: every
+// code unit that is not an ASCII letter or digit becomes '-', so "à" gives one
+// '-' and a character outside the BMP (e.g. an emoji) gives two. Names longer
+// than 200 characters are cut to 200 and suffixed with "-" and the base-36
+// absolute value of a 32-bit string hash of the original path. This matches
+// Claude Code 2.1.x; the rule is not documented, so callers should not rely
+// on it alone. The mapping is not reversible.
 func EncodeProjectPath(p string) string {
-	b := []byte(p)
-	for i, c := range b {
-		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9') {
-			b[i] = '-'
+	var b strings.Builder
+	for _, r := range p {
+		if r < 128 && (r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			continue
 		}
+		units := utf16.RuneLen(r)
+		if units < 1 {
+			units = 1
+		}
+		b.WriteString(strings.Repeat("-", units))
 	}
-	return string(b)
+	name := b.String() // ASCII only, so len is the UTF-16 length
+	if len(name) <= maxProjectDirName {
+		return name
+	}
+	return name[:maxProjectDirName] + "-" + strconv.FormatInt(abs64(int64(jsStringHash(p))), 36)
 }
 
+// jsStringHash is Claude Code's path hash: h = h*31 + c over the UTF-16 code
+// units of s, wrapping at 32 bits.
+func jsStringHash(s string) int32 {
+	var h int32
+	for _, u := range utf16.Encode([]rune(s)) {
+		h = h*31 + int32(u)
+	}
+	return h
+}
+
+func abs64(v int64) int64 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+// attachProjectFolders finds each directory's folder under <base>\projects.
+// The folder name is computed with EncodeProjectPath; when no such folder
+// exists but all the directory's transcripts live in a single folder, that
+// folder is used instead, so the mapping survives encoding changes.
 func (s *Scanner) attachProjectFolders(dirs []Directory) {
 	for i := range dirs {
 		d := &dirs[i]
-		if d.Unresolved {
-			if len(d.TranscriptDirs) == 1 {
-				d.ProjectFolder = d.TranscriptDirs[0]
+		if !d.Unresolved {
+			for _, candidate := range projectPathSpellings(*d) {
+				if f := filepath.Join(s.Loc.ProjectsDir(), EncodeProjectPath(candidate)); isDir(f) {
+					d.ProjectFolder = f
+					break
+				}
 			}
-		} else if f := filepath.Join(s.Loc.ProjectsDir(), EncodeProjectPath(d.Path)); isDir(f) {
-			d.ProjectFolder = f
+		}
+		if d.ProjectFolder == "" && len(d.TranscriptDirs) == 1 &&
+			isChildOf(d.TranscriptDirs[0], s.Loc.ProjectsDir(), 1) && isDir(d.TranscriptDirs[0]) {
+			d.ProjectFolder = d.TranscriptDirs[0]
 		}
 		if d.ProjectFolder != "" {
 			d.HasMemory = isDir(filepath.Join(d.ProjectFolder, "memory"))
 		}
 	}
+}
+
+// projectPathSpellings returns the spellings of a directory's path that
+// Claude Code may have encoded. They only differ for truncated (hashed)
+// names, where the hash depends on the exact separators and case.
+func projectPathSpellings(d Directory) []string {
+	out := []string{d.Path}
+	add := func(p string) {
+		for _, x := range out {
+			if x == p {
+				return
+			}
+		}
+		out = append(out, p)
+	}
+	for _, s := range d.Sessions {
+		if s.Cwd != "" {
+			add(s.Cwd)
+		}
+	}
+	add(strings.ReplaceAll(d.Path, `\`, "/"))
+	return out
 }
 
 func isDir(p string) bool {

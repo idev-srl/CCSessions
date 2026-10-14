@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <meta name="color-scheme" content="light dark"/>
+    <title>CC Sessions</title>
+</head>
+<body>
+<header class="toolbar">
+    <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="dirs" role="tab">Directories</button>
+        <button class="tab" data-tab="settings" role="tab">Settings</button>
+        <button class="tab" data-tab="about" role="tab">About</button>
+    </nav>
+    <div class="toolbar-right" id="dirTools">
+        <input id="search" type="search" placeholder="Search path…" autocomplete="off" spellcheck="false"/>
+        <label class="check"><input id="hideMissing" type="checkbox"/> Hide missing</label>
+        <label class="check"><input id="hideEmpty" type="checkbox"/> Hide without sessions</label>
+    </div>
+    <button id="refresh" class="btn" title="Refresh (F5)">⟳ Refresh</button>
+</header>
+
+<main>
+    <section id="tab-dirs" class="tab-page active">
+        <div class="table-wrap" id="dirTableWrap">
+            <table id="dirTable" class="grid">
+                <thead>
+                <tr>
+                    <th data-sort="path">Path</th>
+                    <th data-sort="last" class="num">Last session</th>
+                    <th data-sort="count" class="num">Sessions</th>
+                    <th data-sort="size" class="num">Size</th>
+                    <th data-sort="state">Status</th>
+                    <th class="actions-col">Actions</th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+            <div id="emptyMsg" class="empty" hidden></div>
+        </div>
+        <div class="splitter" id="splitter" title="Drag to resize"></div>
+        <div class="detail" id="detail"></div>
+    </section>
+
+    <section id="tab-settings" class="tab-page">
+        <div class="page">
+            <h2>Transcript cleanup</h2>
+            <p class="muted">
+                At startup Claude Code deletes transcripts (and other local files) older than
+                <code>cleanupPeriodDays</code> days. The value is read from <code id="settingsPath"></code>.
+            </p>
+            <div class="card">
+                <div class="row"><span class="label">Current value</span><strong id="currentValue">…</strong></div>
+                <div class="row"><span class="label">Last cleanup</span><span id="lastCleanup">—</span></div>
+                <div class="row">
+                    <label class="label" for="daysInput">New value (days)</label>
+                    <input id="daysInput" type="number" min="1" step="1"/>
+                    <button id="saveDays" class="btn primary">Save</button>
+                </div>
+                <p id="daysError" class="error" hidden></p>
+                <p id="preview" class="preview"></p>
+                <p class="muted small">
+                    The estimate uses the last-modified time of the <code>.jsonl</code> files; the documentation does
+                    not say which timestamp Claude Code uses. The minimum is 1: Claude Code rejects 0 with a
+                    validation error. Before saving, a copy <code>settings.json.bak-&lt;timestamp&gt;</code> is
+                    created and every other key is left unchanged.
+                </p>
+            </div>
+            <div id="overrides"></div>
+        </div>
+    </section>
+
+    <section id="tab-about" class="tab-page">
+        <div class="page about">
+            <div class="about-head">
+                <div class="logo">CC</div>
+                <div>
+                    <h1>CC Sessions</h1>
+                    <div class="muted">Session manager for Claude Code on Windows · version <span id="appVersion">…</span></div>
+                </div>
+            </div>
+            <div class="card">
+                <p>
+                    Lists every directory where you started a Claude Code session, lets you open it in Explorer,
+                    Windows Terminal or VS Code, resume sessions, clean up old transcripts and tune
+                    <code>cleanupPeriodDays</code>.
+                </p>
+                <p>
+                    Developed by <a href="#" data-url="website">iDev srl</a> — <span class="muted">idev-srl.com</span>
+                </p>
+                <p>
+                    Open source under the <a href="#" data-url="license">Apache License 2.0</a>.
+                    Redistributions and derivative works must keep the copyright and the <code>NOTICE</code>
+                    file crediting iDev srl as the original author.
+                </p>
+                <p>Source code: <a href="#" data-url="repo">github.com/idev-srl/CCSessions</a></p>
+            </div>
+            <div class="card">
+                <div class="row"><span class="label">Claude config directory</span><code id="aboutConfigDir"></code></div>
+                <div class="row"><span class="label">Project list</span><code id="aboutClaudeJson"></code></div>
+                <p class="muted small">
+                    Everything stays on your computer: no network access, no telemetry. The links above open in
+                    your browser only when you click them.
+                </p>
+            </div>
+            <p class="muted small">
+                Not affiliated with or endorsed by Anthropic. Claude and Claude Code are trademarks of Anthropic, PBC.
+            </p>
+        </div>
+    </section>
+</main>
+
+<footer class="statusbar">
+    <span id="status">Scanning…</span>
+    <span class="spacer"></span>
+    <span id="flash"></span>
+    <button id="errorsBtn" class="link" hidden></button>
+</footer>
+<div id="errorsPanel" class="errors-panel" hidden></div>
+<div id="menu" class="menu" hidden></div>
+<div id="modalBackdrop" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <h3 id="modalTitle"></h3>
+        <div id="modalBody" class="modal-body"></div>
+        <div class="modal-actions">
+            <button id="modalCancel" class="btn">Cancel</button>
+            <button id="modalOk" class="btn danger"></button>
+        </div>
+    </div>
+</div>
+
+<script src="./src/main.ts" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+CC Sessions
+Copyright 2026 iDev srl (https://idev-srl.com)
+
+This product was originally developed by iDev srl.
+
+Licensed under the Apache License, Version 2.0 (see the LICENSE file).
+
+Attribution requirement: as stated in Section 4(d) of the Apache License 2.0,
+any redistribution of this software or of a derivative work must include a
+readable copy of the attribution notices contained in this NOTICE file, for
+example in the documentation, in an "About" screen of the application or
+wherever such third-party notices normally appear. Please keep the reference
+"Originally developed by iDev srl - https://idev-srl.com".
+
+Third-party components:
+
+- Wails v2 (https://wails.io), MIT License
+- golang.org/x/sys, BSD 3-Clause License
+
+Claude and Claude Code are trademarks of Anthropic, PBC. This project is not
+affiliated with or endorsed by Anthropic.

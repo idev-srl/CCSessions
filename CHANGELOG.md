@@ -19,5 +19,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   managed, policy and project settings.
 - Light and dark theme following Windows.
 - About page with license and attribution.
+- Release executable Authenticode-signed by iDev srl.
 
 [1.0.0]: https://github.com/idev-srl/CCSessions/releases/tag/v1.0.0

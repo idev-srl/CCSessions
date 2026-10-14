@@ -75,8 +75,8 @@ A tiny, fast desktop app that lists every directory where you ran
 (preinstalled on Windows 11). Windows Terminal and VS Code are optional.
 
 > [!NOTE]
-> The executable is not code-signed yet, so SmartScreen may warn on first launch. Verify it against
-> `SHA256SUMS.txt` from the release, or build it yourself.
+> Release executables are Authenticode-signed by **iDev srl** with a timestamp (*Properties → Digital
+> Signatures*). You can also verify the files against `SHA256SUMS.txt` from the release.
 
 ## ⌨️ Usage
 
@@ -167,7 +167,8 @@ go test ./internal/...       # unit tests of the data layer
 go run ./cmd/ccscan -v       # read-only command-line diagnostics (-json for JSON output)
 ```
 
-Releases are built by GitHub Actions when a `vX.Y.Z` tag is pushed.
+Releases are built by GitHub Actions when a `vX.Y.Z` tag is pushed, then signed by iDev srl and published
+(see [docs/RELEASING.md](docs/RELEASING.md)).
 
 ### Project layout
 

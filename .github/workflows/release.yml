@@ -4,6 +4,9 @@ on:
   push:
     tags: ['v*.*.*']
 
+# The release is created as a draft: the executable is then code-signed by
+# iDev srl on a maintainer machine and the draft is published (see
+# docs/RELEASING.md).
 permissions:
   contents: write
 
@@ -58,6 +61,7 @@ jobs:
         with:
           name: CC Sessions ${{ github.ref_name }}
           generate_release_notes: true
+          draft: true
           files: |
             ccsessions-*-windows-amd64.zip
             ccsessions-*-windows-amd64.exe

@@ -13,7 +13,7 @@
   "info": {
     "companyName": "iDev srl",
     "productName": "CC Sessions",
-    "productVersion": "1.0.0",
+    "productVersion": "1.0.1",
     "copyright": "Copyright (c) 2026 iDev srl - https://idev-srl.com - Apache License 2.0",
     "comments": "Session manager for Claude Code on Windows. Open source under the Apache License 2.0; attribution to iDev srl required (see NOTICE)."
   }

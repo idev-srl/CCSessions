@@ -198,6 +198,15 @@ and try again.
 </details>
 
 <details>
+<summary><b>I installed Claude Code with npm: is “Remove” still protected?</b></summary>
+
+Partly. The native installer runs `claude.exe`, which the app detects directly. With an npm install the process
+is `node.exe`, which cannot be told apart from other Node.js programs, so the check relies only on the files
+Claude Code writes in `<base>\sessions\<pid>.json` for each running session. Close every Claude Code session
+before removing a directory.
+</details>
+
+<details>
 <summary><b>What does “unknown path” mean?</b></summary>
 
 A transcript folder whose transcripts contain no working directory. Its name alone cannot be decoded reliably.
